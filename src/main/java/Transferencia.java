@@ -15,11 +15,11 @@ import javax.swing.TransferHandler;
 public class Transferencia extends TransferHandler {
 
 	private static final long serialVersionUID = 1L;
-	protected DataFlavor localObjectFlavor;
-	protected int[] indices;
-	protected int addIndex = -1;
-	protected int addCount;
-	private KanbanBoardApp kanbanBoardApp; // Agrega esta variable
+	private final DataFlavor localObjectFlavor;
+	private int[] indices;
+	private int addIndex = -1;
+	private int addCount;
+	private final KanbanBoardApp kanbanBoardApp;
 
 	public Transferencia(KanbanBoardApp kanbanBoardApp) {
 		super();
@@ -30,6 +30,7 @@ public class Transferencia extends TransferHandler {
 	public Transferencia() {
 		super();
 		localObjectFlavor = new DataFlavor(Object[].class, "Array of items");
+		kanbanBoardApp = null; // Opcional si no se utiliza en el constructor sin argumentos
 	}
 
 	@Override
@@ -73,6 +74,7 @@ public class Transferencia extends TransferHandler {
 	}
 
 	@SuppressWarnings("unchecked")
+	@Override
 	public boolean importData(TransferSupport info) {
 		TransferHandler.DropLocation tdl = info.getDropLocation();
 		if (!canImport(info) || !(tdl instanceof JList.DropLocation)) {
@@ -80,26 +82,169 @@ public class Transferencia extends TransferHandler {
 		}
 
 		JList.DropLocation dl = (JList.DropLocation) tdl;
-		JList target = (JList) info.getComponent();
-		DefaultListModel listModel = (DefaultListModel) target.getModel();
-		int max = listModel.getSize();
+		JList<?> target = (JList<?>) info.getComponent();
+		DefaultListModel<Thumbnail> listModel = (DefaultListModel<Thumbnail>) target.getModel();
+
 		int index = dl.getIndex();
+		int max = listModel.getSize();
 		index = index < 0 ? max : index;
 		index = Math.min(index, max);
 
-		addIndex = index;
-
-		try {
-			Object[] values = (Object[]) info.getTransferable().getTransferData(localObjectFlavor);
-			for (int i = 0; i < values.length; i++) {
-				int idx = index + i; // Fix the calculation of the index
-				listModel.add(idx, values[i]);
-				target.addSelectionInterval(idx, idx);
+		// Obtener la lista de origen comparando los modelos de datos
+		JList<?> source = null;
+		Transferable transferable = info.getTransferable();
+		if (transferable.isDataFlavorSupported(localObjectFlavor)) {
+			try {
+				Object[] transferredObjects = (Object[]) transferable.getTransferData(localObjectFlavor);
+				if (transferredObjects.length > 0 && transferredObjects[0] instanceof Thumbnail) {
+					JList<?> sourceList = (JList<?>) info.getComponent();
+					ListModel<?> sourceModel = sourceList.getModel();
+					ListModel<?> targetModel = target.getModel();
+					if (sourceModel == targetModel) {
+						source = sourceList;
+					}
+				}
+			} catch (UnsupportedFlavorException | IOException e) {
+				e.printStackTrace();
 			}
-			addCount = values.length;
+		}
+
+		// Verificar si el origen y el destino son la misma lista
+		if (source == null) {
+			// Importar elementos desde una lista diferente
+			try {
+				Object[] values = (Object[]) info.getTransferable().getTransferData(localObjectFlavor);
+				for (int i = 0; i < values.length; i++) {
+					listModel.add(index + i, (Thumbnail) values[i]);
+					target.addSelectionInterval(index + i, index + i);
+				}
+				addCount = values.length;
+				return true;
+			} catch (UnsupportedFlavorException | IOException ex) {
+				ex.printStackTrace();
+			}
+
+		}
+
+		else {
+
+			try {
+
+				int[] selectedIndices = source.getSelectedIndices();
+
+				int insertIndex = index;
+
+				int de = selectedIndices[0];
+
+				Thumbnail origen = listModel.get(de);
+
+				Thumbnail dest = listModel.get(insertIndex);
+
+				if (selectedIndices.length == 1) {
+
+					if (de - insertIndex == 1) {
+
+						listModel.add(insertIndex, origen);
+
+						listModel.add(++de, dest);
+
+						listModel.remove(++de);
+
+					}
+
+					else {
+
+						if (insertIndex - de == 1) {
+
+							dest = listModel.get(insertIndex);
+
+							listModel.add(insertIndex, dest);
+
+							listModel.add(++insertIndex, origen);
+
+							listModel.remove(++insertIndex);
+
+						}
+
+						else {
+
+							if (de == insertIndex) {
+
+								listModel.add(de, origen);
+
+							}
+
+							else {
+
+								int diferencia = 0;
+
+								System.out.println("de " + de);
+
+								System.out.println(" a " + insertIndex);
+
+								if (de > insertIndex) {
+
+									diferencia = de - insertIndex;
+
+									listModel.add(insertIndex, origen);
+
+									int sumar = de;
+
+									sumar -= 1;
+
+									insertIndex += sumar;
+
+									listModel.add(insertIndex, listModel.get(insertIndex));
+
+									listModel.remove(de += 2);
+
+								}
+
+								else {
+
+									listModel.add(de, origen);
+
+								}
+
+							}
+
+						}
+
+					}
+
+				}
+
+				else {
+
+					for (int i = selectedIndices.length - 1; i >= 0; i--) {
+
+						int selectedIndex = selectedIndices[i];
+
+						System.out.println("de : " + selectedIndex);
+
+						origen = listModel.get(selectedIndex);
+
+						dest = listModel.get(insertIndex);
+
+						System.out.println("A:" + insertIndex);
+
+						// listModel.add(1, origen);
+						// listModel.add(0, dest);
+						if (selectedIndex < insertIndex) {
+
+							insertIndex--;
+
+						}
+
+					}
+
+				}
+			} catch (Exception e) {
+				e.printStackTrace();
+			}
+			// Restablecer la selección de la lista de origen
+			source.clearSelection();
 			return true;
-		} catch (UnsupportedFlavorException | IOException ex) {
-			ex.printStackTrace();
 		}
 
 		return false;
@@ -116,52 +261,33 @@ public class Transferencia extends TransferHandler {
 
 			for (int i = 0; i < model.getSize(); i++) {
 				Thumbnail thumbnail = (Thumbnail) model.getElementAt(i);
-
-				// Pinta el fondo blanco para los ítems seleccionados
 				if (source.isSelectedIndex(i)) {
 					thumbnail.selectedColor = Color.WHITE;
 				}
 			}
 			source.repaint();
 
-			// Restaura el color de fondo a blanco para todas las tareas
-			kanbanBoardApp.updateAllUnselectedItemsBackground();
+			if (kanbanBoardApp != null) {
+				kanbanBoardApp.updateAllUnselectedItemsBackground();
+				kanbanBoardApp.checkAndResizePanels();
+			}
 		}
-
-		// Después de la limpieza, verifica y redimensiona los paneles según sea
-		// necesario
-		kanbanBoardApp.checkAndResizePanels();
 	}
 
 	private void cleanup(JComponent c, boolean remove) {
-
 		if (remove && Objects.nonNull(indices)) {
-
 			if (c instanceof JList) {
-
 				JList<?> source = (JList<?>) c;
-
 				DefaultListModel<?> model = (DefaultListModel<?>) source.getModel();
-
 				for (int i = indices.length - 1; i >= 0; i--) {
-
 					if (indices[i] >= 0 && indices[i] < model.getSize()) {
-
 						model.remove(indices[i]);
-
 					}
-
 				}
-
 			}
-
 			indices = null;
-
 			addCount = 0;
-
 			addIndex = -1;
-
 		}
-
 	}
 }
