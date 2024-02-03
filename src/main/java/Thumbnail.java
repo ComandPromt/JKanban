@@ -16,7 +16,13 @@ public class Thumbnail extends JPanel implements Serializable {
 	public final String name;
 	public final Icon icon;
 	public Color selectedColor;
-	private JButton button; // Nuevo botón
+	private JButton button;
+
+	public Thumbnail(String name) {
+
+		this(name, null);
+
+	}
 
 	public Thumbnail(String name, Icon icon) {
 		this.name = name;

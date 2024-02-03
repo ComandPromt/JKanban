@@ -127,7 +127,7 @@ public class KanbanBoardApp extends JPanel {
 
 				label.setForeground(isSelected ? list.getSelectionForeground() : list.getForeground());
 
-				p.add(p.add(new JLabel("www")));
+				p.add(add(new Thumbnail("www")));
 				p.add(label, BorderLayout.SOUTH);
 				return p;
 			}
